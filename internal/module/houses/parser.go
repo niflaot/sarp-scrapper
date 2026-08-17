@@ -25,9 +25,14 @@ func ParseAvailableHouses(body []byte) ([]House, error) {
 		return nil, fmt.Errorf("decode map JSON: %w", err)
 	}
 
+	containers := housingContainers(root)
+	trustedHousing := len(containers) > 0
+	if !trustedHousing {
+		containers = []any{root}
+	}
+
 	byKey := make(map[string]House)
 	houseShaped := 0
-	recognizedContainer := false
 	var visit func(any)
 	visit = func(value any) {
 		switch typed := value.(type) {
@@ -36,14 +41,7 @@ func ParseAvailableHouses(body []byte) ([]House, error) {
 				visit(item)
 			}
 		case map[string]any:
-			for key, child := range typed {
-				if normalized := normalize(key); normalized == "houses" || normalized == "properties" || normalized == "casas" {
-					if _, ok := child.([]any); ok {
-						recognizedContainer = true
-					}
-				}
-			}
-			if house, shaped, available := parseHouse(typed); shaped {
+			if house, shaped, available := parseHouse(typed, trustedHousing); shaped {
 				houseShaped++
 				if available {
 					house.Available = true
@@ -58,8 +56,10 @@ func ParseAvailableHouses(body []byte) ([]House, error) {
 			}
 		}
 	}
-	visit(root)
-	if houseShaped == 0 && !recognizedContainer {
+	for _, container := range containers {
+		visit(container)
+	}
+	if houseShaped == 0 && !trustedHousing {
 		return nil, fmt.Errorf("map JSON does not contain recognizable house records")
 	}
 
@@ -69,6 +69,32 @@ func ParseAvailableHouses(body []byte) ([]House, error) {
 	}
 	sort.Slice(result, func(i, j int) bool { return numericLess(result[i].Key, result[j].Key) })
 	return result, nil
+}
+
+func housingContainers(root any) []any {
+	containers := make([]any, 0)
+	var visit func(any)
+	visit = func(node any) {
+		switch typed := node.(type) {
+		case []any:
+			for _, child := range typed {
+				visit(child)
+			}
+		case map[string]any:
+			for key, child := range typed {
+				switch normalize(key) {
+				case "housing", "houses", "properties", "casas":
+					if _, ok := child.([]any); ok {
+						containers = append(containers, child)
+						continue
+					}
+				}
+				visit(child)
+			}
+		}
+	}
+	visit(root)
+	return containers
 }
 
 func mergeHouse(existing, incoming House) House {
@@ -90,17 +116,18 @@ func mergeHouse(existing, incoming House) House {
 	return incoming
 }
 
-func parseHouse(record map[string]any) (House, bool, bool) {
+func parseHouse(record map[string]any, trustedHousing bool) (House, bool, bool) {
 	icon, _ := stringValue(value(record, "icon", "iconurl", "iconpath", "marker", "image", "src"))
 	kind, _ := stringValue(value(record, "type", "kind", "category"))
 	status, hasStatus := stringValue(value(record, "status", "state", "saleStatus"))
 	available, hasAvailable := boolValue(value(record, "available", "forsale", "isforsale", "sale", "enventa"))
-	houseSignal := containsAny(strings.ToLower(icon), "radar_propertyg", "house", "casa") || containsAny(strings.ToLower(kind), "house", "casa", "property", "propiedad")
+	houseSignal := containsAny(strings.ToLower(icon), "radar_propertyg", "house", "casa") || containsAny(strings.ToLower(kind), "house", "housing", "casa", "property", "propiedad")
 
 	key, keyOK := stringValue(value(record, "key", "housekey", "propertykey", "llave", "id"))
 	address, addressOK := stringValue(value(record, "address", "direccion", "location", "name"))
 	price, priceOK := integerValue(value(record, "price", "saleprice", "value", "precio"))
-	if popupHouse, ok := houseFromPopup(record); ok {
+	popupHouse, hasHousePopup := houseFromPopup(record)
+	if hasHousePopup {
 		if !keyOK {
 			key, keyOK = popupHouse.Key, true
 		}
@@ -112,6 +139,9 @@ func parseHouse(record map[string]any) (House, bool, bool) {
 		}
 	}
 	if !keyOK || (!addressOK && !priceOK && !houseSignal) {
+		return House{}, false, false
+	}
+	if !trustedHousing && !houseSignal && !hasHousePopup {
 		return House{}, false, false
 	}
 

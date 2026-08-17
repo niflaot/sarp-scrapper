@@ -70,3 +70,44 @@ func TestParseAvailableHousesFromMapIconPopup(t *testing.T) {
 		t.Fatalf("unexpected house: %#v", house)
 	}
 }
+
+func TestParseAvailableHousesUsesOnlyHousingContainer(t *testing.T) {
+	body := []byte(`{
+      "message":"OK",
+      "payload":{
+        "businesses":[
+          {"id":683,"name":"JIZZY´S","price":1402085,"available":true}
+        ],
+        "housing":[
+          {"id":1527,"name":"Main Street, Conference Center, Los Santos 313, San Andreas","price":89744,"available":true}
+        ]
+      }
+    }`)
+
+	houses, err := ParseAvailableHouses(body)
+	if err != nil || len(houses) != 1 {
+		t.Fatalf("ParseAvailableHouses() = %#v, %v", houses, err)
+	}
+	if houses[0].Key != "1527" || houses[0].Address != "Main Street, Conference Center, Los Santos 313, San Andreas" {
+		t.Fatalf("unexpected housing record: %#v", houses[0])
+	}
+}
+
+func TestParseAvailableHousesDoesNotTreatBusinessesAsHouses(t *testing.T) {
+	body := []byte(`{"payload":{"businesses":[{"id":683,"name":"JIZZY´S","price":1402085,"available":true}],"housing":[]}}`)
+	houses, err := ParseAvailableHouses(body)
+	if err != nil || len(houses) != 0 {
+		t.Fatalf("ParseAvailableHouses() = %#v, %v", houses, err)
+	}
+}
+
+func TestParseAvailableHousesFiltersFlatMapIconsByType(t *testing.T) {
+	body := []byte(`{"payload":[
+      {"id":683,"name":"JIZZY´S","price":1402085,"available":true,"type":"business"},
+      {"id":1527,"name":"Main Street","price":89744,"available":true,"type":"housing"}
+    ]}`)
+	houses, err := ParseAvailableHouses(body)
+	if err != nil || len(houses) != 1 || houses[0].Key != "1527" {
+		t.Fatalf("ParseAvailableHouses() = %#v, %v", houses, err)
+	}
+}

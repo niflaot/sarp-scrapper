@@ -12,7 +12,7 @@ import (
 
 func TestHouseRoutes(t *testing.T) {
 	repository := NewMemoryRepository()
-	service := NewService(&sourceStub{body: []byte(`[{"key":749,"address":"Rodeo","price":100,"available":true}]`)}, repository, nil, zap.NewNop())
+	service := NewService(&sourceStub{body: []byte(`[{"key":749,"address":"Rodeo","price":100,"available":true,"type":"housing"}]`)}, repository, nil, zap.NewNop())
 	httpServer := server.New(server.Config{Environment: server.EnvironmentDevelopment, BindHost: "127.0.0.1", BindPort: 8080}, zap.NewNop())
 	Register(httpServer, NewHandler(service))
 

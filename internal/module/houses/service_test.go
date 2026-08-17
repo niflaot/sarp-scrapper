@@ -31,7 +31,7 @@ func (s *sourceStub) FetchMap(ctx context.Context) ([]byte, error) {
 
 func TestServiceRefresh(t *testing.T) {
 	repository := NewMemoryRepository()
-	service := NewService(&sourceStub{body: []byte(`[{"key":749,"address":"Rodeo","price":100,"available":true}]`)}, repository, nil, zap.NewNop())
+	service := NewService(&sourceStub{body: []byte(`[{"key":749,"address":"Rodeo","price":100,"available":true,"type":"housing"}]`)}, repository, nil, zap.NewNop())
 	now := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
 	service.now = func() time.Time { return now }
 

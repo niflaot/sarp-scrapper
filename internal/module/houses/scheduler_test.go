@@ -38,7 +38,7 @@ func TestSchedulerNextDelay(t *testing.T) {
 
 func TestSchedulerLifecycle(t *testing.T) {
 	repository := NewMemoryRepository()
-	service := NewService(&sourceStub{body: []byte(`[{"key":749,"address":"Rodeo","price":100,"available":true}]`)}, repository, nil, zap.NewNop())
+	service := NewService(&sourceStub{body: []byte(`[{"key":749,"address":"Rodeo","price":100,"available":true,"type":"housing"}]`)}, repository, nil, zap.NewNop())
 	scheduler := NewScheduler(sarp.Config{Enabled: true, Interval: time.Hour}, service, zap.NewNop())
 	recorder := &lifecycleRecorder{}
 	RegisterScheduler(recorder, scheduler)
