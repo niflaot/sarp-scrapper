@@ -154,6 +154,17 @@ func (s *Store) Available() []Record {
 	return result
 }
 
+func (s *Store) MinimumValue(kind string) int64 {
+	switch kind {
+	case "house":
+		return s.config.HouseMinValue
+	case "business":
+		return s.config.BusinessMinValue
+	default:
+		return 0
+	}
+}
+
 func (s *Store) load() error {
 	file, err := os.Open(s.config.StateFile)
 	if errors.Is(err, os.ErrNotExist) {

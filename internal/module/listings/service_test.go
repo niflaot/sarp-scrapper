@@ -42,3 +42,35 @@ func TestServiceProcessesAndNotifiesNewListingsOnce(t *testing.T) {
 		t.Fatalf("notices = %#v", notifier.notices)
 	}
 }
+
+func TestServiceFiltersListingsBelowConfiguredMinimums(t *testing.T) {
+	store, err := review.NewStore(review.Config{
+		StateFile: filepath.Join(t.TempDir(), "state.json"), HouseMinValue: 500000, BusinessMinValue: 100000,
+	}, zap.NewNop())
+	if err != nil {
+		t.Fatalf("NewStore() error = %v", err)
+	}
+	notifier := &notifierStub{enabled: true}
+	service := NewService(store, notifier, zap.NewNop())
+
+	if _, err := service.Process(context.Background(), KindHouse, []review.Item{
+		{Key: "low-house", Name: "Low", Value: 499999}, {Key: "house", Name: "House", Value: 500000},
+	}); err != nil {
+		t.Fatalf("Process(house) error = %v", err)
+	}
+	if _, err := service.Process(context.Background(), KindBusiness, []review.Item{
+		{Key: "low-business", Name: "Low", Value: 99999}, {Key: "business", Name: "Business", Value: 100000},
+	}); err != nil {
+		t.Fatalf("Process(business) error = %v", err)
+	}
+
+	visible := service.Available()
+	if len(visible) != 2 || len(notifier.notices) != 2 {
+		t.Fatalf("visible = %#v, notices = %#v", visible, notifier.notices)
+	}
+	for _, record := range visible {
+		if record.Key == "low-house" || record.Key == "low-business" {
+			t.Fatalf("below-threshold record remained visible: %#v", record)
+		}
+	}
+}

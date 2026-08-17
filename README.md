@@ -46,6 +46,8 @@ Variables principales:
 | `SARP_SCRAPE_INTERVAL` | `30m` | Intervalo central. |
 | `SARP_SCRAPE_JITTER` | `5m` | Variación uniforme positiva/negativa. |
 | `LISTINGS_STATE_FILE` | `.cache/listings-state.json` | Archivo JSON persistente con decisiones y notificaciones. |
+| `LISTINGS_HOUSE_MIN_VALUE` | `500000` | Valor mínimo inclusivo para mostrar y notificar propiedades. |
+| `LISTINGS_BUSINESS_MIN_VALUE` | `100000` | Valor mínimo inclusivo para mostrar y notificar negocios. |
 | `DISCORD_WEBHOOK_URL` | vacío | Webhook entrante para nuevos negocios y propiedades. |
 | `DISCORD_WEBHOOK_TIMEOUT` | `10s` | Timeout de cada notificación. |
 

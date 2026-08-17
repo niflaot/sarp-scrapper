@@ -31,6 +31,7 @@ func NewService(store *review.Store, notifier Notifier, log *zap.Logger) *Servic
 }
 
 func (s *Service) Process(ctx context.Context, kind string, items []review.Item) ([]review.Record, error) {
+	items = s.filterItems(kind, items)
 	now := s.now().UTC()
 	visible, unnotified, err := s.store.Reconcile(kind, items, now)
 	if err != nil {
@@ -59,7 +60,27 @@ func (s *Service) SetStatus(kind, key string, status review.Status) (review.Reco
 	return s.store.SetStatus(kind, key, status, s.now().UTC())
 }
 
-func (s *Service) Available() []review.Record { return s.store.Available() }
+func (s *Service) Available() []review.Record {
+	records := s.store.Available()
+	filtered := records[:0]
+	for _, record := range records {
+		if record.Value >= s.store.MinimumValue(record.Kind) {
+			filtered = append(filtered, record)
+		}
+	}
+	return filtered
+}
+
+func (s *Service) filterItems(kind string, items []review.Item) []review.Item {
+	minimum := s.store.MinimumValue(kind)
+	filtered := make([]review.Item, 0, len(items))
+	for _, item := range items {
+		if item.Value >= minimum {
+			filtered = append(filtered, item)
+		}
+	}
+	return filtered
+}
 
 func kindLabel(kind string) string {
 	if kind == KindBusiness {
