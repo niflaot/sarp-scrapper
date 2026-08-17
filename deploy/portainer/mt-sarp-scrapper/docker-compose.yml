@@ -1,11 +1,25 @@
 version: "3.8"
 
 services:
+  mt-flare:
+    image: ghcr.io/flaresolverr/flaresolverr:${FLARESOLVERR_VERSION:?FLARESOLVERR_VERSION is required}
+    container_name: mt-flare
+    restart: unless-stopped
+    environment:
+      PORT: "3000"
+      LOG_LEVEL: "${FLARESOLVERR_LOG_LEVEL:-info}"
+      TZ: "${TZ:-America/Bogota}"
+      LANG: "${LANG:-es_CO}"
+    networks:
+      - fl-network
+
   mt-sarp-scrapper:
     image: ${SARP_GO_IMAGE:?SARP_GO_IMAGE is required}
     container_name: mt-sarp-scrapper
     restart: unless-stopped
     init: true
+    depends_on:
+      - mt-flare
     working_dir: /workspace/source
     entrypoint:
       - /bin/bash
@@ -88,7 +102,7 @@ services:
       SARP_API_BASE_URL: "${SARP_API_BASE_URL:-https://api.sarp.es/api}"
       SARP_API_TIMEOUT: "${SARP_API_TIMEOUT:-30s}"
       SARP_API_USER_AGENT: "${SARP_API_USER_AGENT:-sarp-scrapper/1.0}"
-      SARP_FLARESOLVERR_URL: "${SARP_FLARESOLVERR_URL:-https://flare.niflaot.dev/v1}"
+      SARP_FLARESOLVERR_URL: "${SARP_FLARESOLVERR_URL:-http://mt-flare:3000/v1}"
       SARP_FLARESOLVERR_TIMEOUT: "${SARP_FLARESOLVERR_TIMEOUT:-90s}"
       SARP_SCRAPE_INTERVAL: "${SARP_SCRAPE_INTERVAL:-30m}"
       SARP_SCRAPE_JITTER: "${SARP_SCRAPE_JITTER:-5m}"

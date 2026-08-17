@@ -4,9 +4,9 @@ Portainer Stack that resolves `SARP_GIT_REF` as a remote branch, tag, or full
 commit SHA, builds the Go binary only when the resolved commit changes, and runs
 it on internal port `3000`.
 
-Deploy `mt-flare` first. Both containers must share the same host public egress
-IP so the scraper can reuse the Cloudflare clearance obtained by
-`https://flare.niflaot.dev/v1`.
+This Stack deploys both `mt-flare` and `mt-sarp-scrapper`. They share the same
+Docker network and host public egress IP, allowing the scraper to reuse the
+Cloudflare clearance obtained internally from `http://mt-flare:3000/v1`.
 
 Copy `.env.example` into Portainer, replace `API_TOKEN`, and preferably pin
 `SARP_GIT_REF` to the delivered commit SHA. The service is available to other
@@ -21,12 +21,12 @@ want to reset all decisions and notification history.
 minimums. Results below them are omitted from the APIs, panel, cache reconciliation,
 and Discord notifications. Their defaults are `500000` and `100000` respectively.
 
-To expose the panel through the existing Flare domain while keeping `/v1` routed
-to FlareSolverr, use path-based Caddy routing:
+Expose the panel through the existing Flare domain while keeping `/v1` and every
+non-scraper path routed to FlareSolverr:
 
 ```caddyfile
 flare.niflaot.dev {
-    @scraper path /panel* /listings* /houses* /businesses* /status
+    @scraper path /panel /panel/* /listings /listings/* /houses /houses/* /businesses /businesses/* /status
     handle @scraper {
         reverse_proxy mt-sarp-scrapper:3000
     }
