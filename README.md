@@ -6,7 +6,7 @@ configuración con `caarlos0/env` + `godotenv`, OpenAPI generado y Scalar.
 ## Flujo
 
 Cuando `API_TOKEN` está configurado, el servicio usa la API oficial y consulta
-`GET https://api.sarp.es/api/map/icons`. Si Cloudflare presenta un desafío y
+`GET https://api.sarp.es/api/map/icons` y `GET /api/businesses/available`. Si Cloudflare presenta un desafío y
 `SARP_FLARESOLVERR_URL` está configurado, solicita a FlareSolverr una cookie de
 clearance y repite la llamada con esa cookie, el mismo `User-Agent` y el token
 Bearer. El token nunca se envía a FlareSolverr. Si la API sigue fallando, abre
@@ -23,7 +23,7 @@ Una vez autenticado, el scraper carga el mapa Leaflet y combina:
 - frames JSON de WebSocket;
 - popups visibles con el icono `radar_propertyG`.
 
-El snapshot se actualiza inmediatamente al arrancar el worker y luego cada
+Los snapshots se actualizan inmediatamente al arrancar los workers y luego cada
 `30m ± 5m`. Si el login se completa después del arranque, llama una vez a
 `POST /houses/refresh` para no esperar la siguiente ventana.
 
@@ -45,6 +45,9 @@ Variables principales:
 | `SARP_PASSWORD` | vacío | Contraseña utilizada por el login del navegador. |
 | `SARP_SCRAPE_INTERVAL` | `30m` | Intervalo central. |
 | `SARP_SCRAPE_JITTER` | `5m` | Variación uniforme positiva/negativa. |
+| `LISTINGS_STATE_FILE` | `.cache/listings-state.json` | Archivo JSON persistente con decisiones y notificaciones. |
+| `DISCORD_WEBHOOK_URL` | vacío | Webhook entrante para nuevos negocios y propiedades. |
+| `DISCORD_WEBHOOK_TIMEOUT` | `10s` | Timeout de cada notificación. |
 
 El resto de URLs, selectores, timeouts y opciones del navegador usan defaults
 internos; no es necesario declararlos en `.env`.
@@ -90,6 +93,12 @@ También se puede enviar el código desde el primer POST:
 | `POST /auth/2fa` | Completa un desafío pendiente. |
 | `GET /houses` | Último snapshot de casas disponibles. |
 | `POST /houses/refresh` | Ejecuta un scrape sincronizado. |
+| `GET /businesses` | Último snapshot de negocios disponibles. |
+| `POST /businesses/refresh` | Actualiza los negocios sincronizadamente. |
+| `GET /listings` | Propiedades y negocios visibles con estado de revisión. |
+| `POST /listings/:kind/:key/review` | Marca como revisado y lo mantiene visible. |
+| `POST /listings/:kind/:key/ignore` | Lo oculta permanentemente. |
+| `GET /panel` | Panel HTML para revisar o ignorar resultados. |
 | `GET /docs` | Scalar, sólo en desarrollo. |
 | `GET /openapi.json` | OpenAPI, sólo en desarrollo. |
 
@@ -106,6 +115,20 @@ pedir a FlareSolverr cookies y `User-Agent`; después hace la llamada autenticad
 desde el propio proceso. Por eso el scraper y FlareSolverr deben compartir la
 misma IP pública de salida. El token Bearer no forma parte de la solicitud a
 FlareSolverr.
+
+## Panel, caché y Discord
+
+Cada resultado se guarda por tipo (`house` o `business`) y llave en el archivo
+configurado por `LISTINGS_STATE_FILE`. Un resultado nuevo empieza como
+`pending`; `review` lo deja visible con la etiqueta de revisado e `ignore` lo
+elimina de `/panel`, `/listings`, `/houses` o `/businesses`, incluso si vuelve a
+aparecer en scrapes posteriores.
+
+Cuando `DISCORD_WEBHOOK_URL` está configurado, cada resultado nuevo genera una
+notificación con `@everyone`, nombre, valor, llave e icono. La notificación se
+marca como enviada solamente después de una respuesta exitosa, por lo que los
+fallos se reintentan en el siguiente refresh. El webhook real nunca debe
+guardarse en Git.
 
 ## Fallback automático con Chrome
 

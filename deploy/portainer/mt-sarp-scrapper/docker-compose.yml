@@ -72,6 +72,7 @@ services:
           exec "$${binary_path}"
     volumes:
       - mt-sarp-scrapper-workspace:/workspace
+      - mt-sarp-scrapper-data:/data
     environment:
       SARP_REPOSITORY_URL: "${SARP_REPOSITORY_URL:?SARP_REPOSITORY_URL is required}"
       SARP_GIT_REF: "${SARP_GIT_REF:?SARP_GIT_REF is required}"
@@ -91,12 +92,18 @@ services:
       SARP_FLARESOLVERR_TIMEOUT: "${SARP_FLARESOLVERR_TIMEOUT:-90s}"
       SARP_SCRAPE_INTERVAL: "${SARP_SCRAPE_INTERVAL:-30m}"
       SARP_SCRAPE_JITTER: "${SARP_SCRAPE_JITTER:-5m}"
+      LISTINGS_STATE_FILE: /data/listings-state.json
+      DISCORD_WEBHOOK_URL: "${DISCORD_WEBHOOK_URL:-}"
+      DISCORD_WEBHOOK_TIMEOUT: "${DISCORD_WEBHOOK_TIMEOUT:-10s}"
+      DISCORD_WEBHOOK_USERNAME: "${DISCORD_WEBHOOK_USERNAME:-SARP Scrapper}"
     networks:
       - fl-network
 
 volumes:
   mt-sarp-scrapper-workspace:
     name: mt-sarp-scrapper-workspace
+  mt-sarp-scrapper-data:
+    name: mt-sarp-scrapper-data
 
 networks:
   fl-network:

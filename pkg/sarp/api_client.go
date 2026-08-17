@@ -51,14 +51,15 @@ type clearance struct {
 }
 
 type APIClient struct {
-	config      Config
-	log         *zap.Logger
-	httpClient  *http.Client
-	flareClient *http.Client
-	stateMu     sync.RWMutex
-	state       session.State
-	clearanceMu sync.RWMutex
-	clearance   *clearance
+	config             Config
+	log                *zap.Logger
+	httpClient         *http.Client
+	flareClient        *http.Client
+	stateMu            sync.RWMutex
+	state              session.State
+	clearanceMu        sync.RWMutex
+	clearance          *clearance
+	clearanceRefreshMu sync.Mutex
 }
 
 func NewAPIClient(config Config, log *zap.Logger) *APIClient {
@@ -74,36 +75,53 @@ func NewAPIClient(config Config, log *zap.Logger) *APIClient {
 }
 
 func (c *APIClient) FetchMap(ctx context.Context) ([]byte, error) {
+	return c.fetch(ctx, "/map/icons", "map icons")
+}
+
+func (c *APIClient) FetchBusinesses(ctx context.Context) ([]byte, error) {
+	return c.fetch(ctx, "/businesses/available", "available businesses")
+}
+
+func (c *APIClient) fetch(ctx context.Context, path, label string) ([]byte, error) {
 	if c.config.APIToken == "" {
 		return nil, c.fail(ErrAPITokenMissing)
 	}
 
-	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") + "/map/icons"
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") + path
 	activeClearance := c.currentClearance()
-	body, err := c.fetchMap(ctx, endpoint, activeClearance)
+	body, err := c.fetchEndpoint(ctx, endpoint, activeClearance)
 	if err == nil {
-		return c.succeed(body)
+		return c.succeed(body, label)
 	}
 	if !errors.Is(err, ErrAPICloudflareChallenge) || c.config.FlareSolverrURL == "" {
 		return nil, c.fail(err)
 	}
 
+	c.clearanceRefreshMu.Lock()
+	defer c.clearanceRefreshMu.Unlock()
+	latestClearance := c.currentClearance()
+	if !clearanceEqual(activeClearance, latestClearance) {
+		body, retryErr := c.fetchEndpoint(ctx, endpoint, latestClearance)
+		if retryErr == nil {
+			return c.succeed(body, label)
+		}
+	}
 	activeClearance, solveErr := c.solveCloudflare(ctx, endpoint)
 	if solveErr != nil {
 		return nil, c.fail(errors.Join(err, solveErr))
 	}
 	c.storeClearance(activeClearance)
-	body, err = c.fetchMap(ctx, endpoint, activeClearance)
+	body, err = c.fetchEndpoint(ctx, endpoint, activeClearance)
 	if err != nil {
-		return nil, c.fail(fmt.Errorf("retry SARP map icons with FlareSolverr clearance: %w", err))
+		return nil, c.fail(fmt.Errorf("retry SARP %s with FlareSolverr clearance: %w", label, err))
 	}
-	return c.succeed(body)
+	return c.succeed(body, label)
 }
 
-func (c *APIClient) fetchMap(ctx context.Context, endpoint string, activeClearance *clearance) ([]byte, error) {
+func (c *APIClient) fetchEndpoint(ctx context.Context, endpoint string, activeClearance *clearance) ([]byte, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return nil, fmt.Errorf("create SARP map icons request: %w", err)
+		return nil, fmt.Errorf("create SARP API request: %w", err)
 	}
 	request.Header.Set("Authorization", "Bearer "+c.config.APIToken)
 	request.Header.Set("Accept", "application/json")
@@ -119,22 +137,22 @@ func (c *APIClient) fetchMap(ctx context.Context, endpoint string, activeClearan
 
 	response, err := c.httpClient.Do(request)
 	if err != nil {
-		return nil, fmt.Errorf("request SARP map icons: %w", err)
+		return nil, fmt.Errorf("request SARP API: %w", err)
 	}
 	defer response.Body.Close()
 
 	body, err := readLimited(response.Body, maxAPIResponseSize)
 	if err != nil {
-		return nil, fmt.Errorf("read SARP map icons response: %w", err)
+		return nil, fmt.Errorf("read SARP API response: %w", err)
 	}
 	if strings.EqualFold(response.Header.Get("cf-mitigated"), "challenge") {
 		return nil, ErrAPICloudflareChallenge
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return nil, fmt.Errorf("SARP map icons returned HTTP %d", response.StatusCode)
+		return nil, fmt.Errorf("SARP API returned HTTP %d", response.StatusCode)
 	}
 	if !json.Valid(body) {
-		return nil, fmt.Errorf("SARP map icons returned a non-JSON response")
+		return nil, fmt.Errorf("SARP API returned a non-JSON response")
 	}
 	return body, nil
 }
@@ -200,9 +218,9 @@ func readLimited(reader io.Reader, limit int64) ([]byte, error) {
 	return body, nil
 }
 
-func (c *APIClient) succeed(body []byte) ([]byte, error) {
+func (c *APIClient) succeed(body []byte, label string) ([]byte, error) {
 	c.setState(session.StateAvailable)
-	c.log.Debug("SARP map icons fetched from API", zap.Int("bytes", len(body)))
+	c.log.Debug("SARP resource fetched from API", zap.String("resource", label), zap.Int("bytes", len(body)))
 	return body, nil
 }
 
@@ -221,6 +239,21 @@ func (c *APIClient) storeClearance(value *clearance) {
 	c.clearanceMu.Lock()
 	c.clearance = value
 	c.clearanceMu.Unlock()
+}
+
+func clearanceEqual(left, right *clearance) bool {
+	if left == nil || right == nil {
+		return left == right
+	}
+	if left.UserAgent != right.UserAgent || len(left.Cookies) != len(right.Cookies) {
+		return false
+	}
+	for index := range left.Cookies {
+		if left.Cookies[index] != right.Cookies[index] {
+			return false
+		}
+	}
+	return true
 }
 
 func (c *APIClient) Status() session.State {

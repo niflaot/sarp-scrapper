@@ -12,7 +12,7 @@ import (
 
 func TestHouseRoutes(t *testing.T) {
 	repository := NewMemoryRepository()
-	service := NewService(&sourceStub{body: []byte(`[{"key":749,"address":"Rodeo","price":100,"available":true}]`)}, repository, zap.NewNop())
+	service := NewService(&sourceStub{body: []byte(`[{"key":749,"address":"Rodeo","price":100,"available":true}]`)}, repository, nil, zap.NewNop())
 	httpServer := server.New(server.Config{Environment: server.EnvironmentDevelopment, BindHost: "127.0.0.1", BindPort: 8080}, zap.NewNop())
 	Register(httpServer, NewHandler(service))
 
@@ -40,7 +40,7 @@ func TestHouseRoutes(t *testing.T) {
 }
 
 func TestRefreshRouteWhenDisabled(t *testing.T) {
-	service := NewService(&sourceStub{err: sarp.ErrDisabled}, NewMemoryRepository(), zap.NewNop())
+	service := NewService(&sourceStub{err: sarp.ErrDisabled}, NewMemoryRepository(), nil, zap.NewNop())
 	httpServer := server.New(server.Config{Environment: server.EnvironmentDevelopment, BindHost: "127.0.0.1", BindPort: 8080}, zap.NewNop())
 	Register(httpServer, NewHandler(service))
 	response, err := httpServer.App().Test(newRequest(t, http.MethodPost, "/houses/refresh"))

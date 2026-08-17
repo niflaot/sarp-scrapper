@@ -140,6 +140,25 @@ func TestAPIClientUsesFlareSolverrClearance(t *testing.T) {
 	}
 }
 
+func TestAPIClientFetchBusinesses(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/api/businesses/available" {
+			t.Errorf("path = %q", request.URL.Path)
+		}
+		response.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(response, `{"businesses":[{"id":4,"name":"24/7","price":5000}],"total":1}`)
+	}))
+	defer server.Close()
+	client := NewAPIClient(Config{
+		APIToken: "sarp_test", APIBaseURL: server.URL + "/api",
+		APITimeout: time.Second, APIUserAgent: "test-client/1.0",
+	}, zap.NewNop())
+	body, err := client.FetchBusinesses(context.Background())
+	if err != nil || !strings.Contains(string(body), "businesses") {
+		t.Fatalf("FetchBusinesses() = %q, %v", body, err)
+	}
+}
+
 func TestAPIClientReportsFlareSolverrFailure(t *testing.T) {
 	apiServer := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
 		response.Header().Set("cf-mitigated", "challenge")

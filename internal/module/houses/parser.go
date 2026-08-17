@@ -78,6 +78,9 @@ func mergeHouse(existing, incoming House) House {
 	if incoming.Price == 0 {
 		incoming.Price = existing.Price
 	}
+	if incoming.Icon == "" {
+		incoming.Icon = existing.Icon
+	}
 	if incoming.Latitude == nil {
 		incoming.Latitude = existing.Latitude
 	}
@@ -112,7 +115,7 @@ func parseHouse(record map[string]any) (House, bool, bool) {
 		return House{}, false, false
 	}
 
-	house := House{Key: key, Address: address, Price: price}
+	house := House{Key: key, Address: address, Price: price, Icon: icon}
 	if latitude, ok := floatValue(value(record, "latitude", "lat", "y")); ok {
 		house.Latitude = &latitude
 	}

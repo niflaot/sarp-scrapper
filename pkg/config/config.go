@@ -8,15 +8,19 @@ import (
 
 	"github.com/caarlos0/env/v11"
 	"github.com/joho/godotenv"
+	"github.com/niflaot/sarp-scrapper/pkg/discord"
 	"github.com/niflaot/sarp-scrapper/pkg/logger"
+	"github.com/niflaot/sarp-scrapper/pkg/review"
 	"github.com/niflaot/sarp-scrapper/pkg/sarp"
 	"github.com/niflaot/sarp-scrapper/pkg/server"
 )
 
 type Config struct {
-	Server server.Config
-	Logger logger.Config
-	SARP   sarp.Config
+	Server  server.Config
+	Logger  logger.Config
+	SARP    sarp.Config
+	Discord discord.Config
+	Review  review.Config
 }
 
 func Load() (*Config, error) { return load(".env") }
@@ -45,9 +49,17 @@ func (c Config) Validate() error {
 	if err := c.SARP.Validate(); err != nil {
 		return fmt.Errorf("SARP configuration: %w", err)
 	}
+	if err := c.Discord.Validate(); err != nil {
+		return fmt.Errorf("Discord configuration: %w", err)
+	}
+	if err := c.Review.Validate(); err != nil {
+		return fmt.Errorf("review configuration: %w", err)
+	}
 	return nil
 }
 
-func Server(c *Config) server.Config { return c.Server }
-func Logger(c *Config) logger.Config { return c.Logger }
-func SARP(c *Config) sarp.Config     { return c.SARP }
+func Server(c *Config) server.Config   { return c.Server }
+func Logger(c *Config) logger.Config   { return c.Logger }
+func SARP(c *Config) sarp.Config       { return c.SARP }
+func Discord(c *Config) discord.Config { return c.Discord }
+func Review(c *Config) review.Config   { return c.Review }
