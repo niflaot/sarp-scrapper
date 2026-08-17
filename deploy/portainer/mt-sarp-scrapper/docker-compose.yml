@@ -1,0 +1,103 @@
+version: "3.8"
+
+services:
+  mt-sarp-scrapper:
+    image: ${SARP_GO_IMAGE:?SARP_GO_IMAGE is required}
+    container_name: mt-sarp-scrapper
+    restart: unless-stopped
+    init: true
+    working_dir: /workspace/source
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+          set -Eeuo pipefail
+
+          : "$${SARP_REPOSITORY_URL:?SARP_REPOSITORY_URL is required}"
+          : "$${SARP_GIT_REF:?SARP_GIT_REF is required}"
+          : "$${API_TOKEN:?API_TOKEN is required}"
+          : "$${SARP_FLARESOLVERR_URL:?SARP_FLARESOLVERR_URL is required}"
+
+          readonly workspace=/workspace
+          readonly source_directory="$${workspace}/source"
+          readonly binary_directory="$${workspace}/bin"
+          readonly binary_path="$${binary_directory}/sarp-scrapper"
+          readonly temporary_binary="$${binary_path}.tmp"
+          readonly commit_state="$${binary_directory}/commit"
+
+          if [[ ! -d "$${source_directory}/.git" ]]; then
+            if [[ -e "$${source_directory}" ]] && [[ -n "$$(find "$${source_directory}" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
+              echo "$${source_directory} exists but is not an empty Git checkout." >&2
+              exit 1
+            fi
+            git clone --no-checkout "$${SARP_REPOSITORY_URL}" "$${source_directory}"
+          fi
+
+          current_origin="$$(git -C "$${source_directory}" remote get-url origin)"
+          if [[ "$${current_origin}" != "$${SARP_REPOSITORY_URL}" ]]; then
+            echo "Refusing to update $${source_directory}: its origin does not match SARP_REPOSITORY_URL." >&2
+            exit 1
+          fi
+
+          git -C "$${source_directory}" fetch --prune --tags origin '+refs/heads/*:refs/remotes/origin/*'
+
+          resolved_commit=""
+          for candidate in "refs/remotes/origin/$${SARP_GIT_REF}" "refs/tags/$${SARP_GIT_REF}" "$${SARP_GIT_REF}"; do
+            if resolved_commit="$$(git -C "$${source_directory}" rev-parse --verify "$${candidate}^{commit}" 2>/dev/null)"; then
+              break
+            fi
+          done
+
+          if [[ -z "$${resolved_commit}" ]]; then
+            echo "SARP_GIT_REF '$${SARP_GIT_REF}' does not resolve to a branch, tag, or commit." >&2
+            exit 1
+          fi
+
+          git -C "$${source_directory}" checkout --detach --force "$${resolved_commit}"
+          git -C "$${source_directory}" clean -ffd
+
+          mkdir -p "$${binary_directory}"
+          trap 'rm -f "$${temporary_binary}"' EXIT
+
+          if [[ ! -x "$${binary_path}" || "$$(cat "$${commit_state}" 2>/dev/null || true)" != "$${resolved_commit}" ]]; then
+            go mod download
+            CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "$${temporary_binary}" ./cmd
+            mv "$${temporary_binary}" "$${binary_path}"
+            printf '%s' "$${resolved_commit}" > "$${commit_state}"
+            echo "Built sarp-scrapper from $${resolved_commit}."
+          else
+            echo "Reusing sarp-scrapper built from $${resolved_commit}."
+          fi
+
+          exec "$${binary_path}"
+    volumes:
+      - mt-sarp-scrapper-workspace:/workspace
+    environment:
+      SARP_REPOSITORY_URL: "${SARP_REPOSITORY_URL:?SARP_REPOSITORY_URL is required}"
+      SARP_GIT_REF: "${SARP_GIT_REF:?SARP_GIT_REF is required}"
+      GIT_TERMINAL_PROMPT: "0"
+      GOTOOLCHAIN: local
+      APP_ENVIRONMENT: production
+      BIND_HOST: 0.0.0.0
+      BIND_PORT: "3000"
+      LOG_JSON: "true"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      SARP_SCRAPER_ENABLED: "true"
+      API_TOKEN: "${API_TOKEN:?API_TOKEN is required}"
+      SARP_API_BASE_URL: "${SARP_API_BASE_URL:-https://api.sarp.es/api}"
+      SARP_API_TIMEOUT: "${SARP_API_TIMEOUT:-30s}"
+      SARP_API_USER_AGENT: "${SARP_API_USER_AGENT:-sarp-scrapper/1.0}"
+      SARP_FLARESOLVERR_URL: "${SARP_FLARESOLVERR_URL:-https://flare.niflaot.dev/v1}"
+      SARP_FLARESOLVERR_TIMEOUT: "${SARP_FLARESOLVERR_TIMEOUT:-90s}"
+      SARP_SCRAPE_INTERVAL: "${SARP_SCRAPE_INTERVAL:-30m}"
+      SARP_SCRAPE_JITTER: "${SARP_SCRAPE_JITTER:-5m}"
+    networks:
+      - fl-network
+
+volumes:
+  mt-sarp-scrapper-workspace:
+    name: mt-sarp-scrapper-workspace
+
+networks:
+  fl-network:
+    external: true
