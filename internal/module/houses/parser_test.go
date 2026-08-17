@@ -78,9 +78,9 @@ func TestParseAvailableHousesUsesOnlyHousingContainer(t *testing.T) {
         "businesses":[
           {"id":683,"name":"JIZZY´S","price":1402085,"available":true}
         ],
-        "housing":[
-          {"id":1527,"name":"Main Street, Conference Center, Los Santos 313, San Andreas","price":89744,"available":true}
-        ]
+		"housing":[
+		  {"id":1345,"address":"Camino del Sol, Richman, Los Santos 806, San Andreas","value":742203,"ExitX":-1276.4,"ExitY":311.2}
+		]
       }
     }`)
 
@@ -88,7 +88,7 @@ func TestParseAvailableHousesUsesOnlyHousingContainer(t *testing.T) {
 	if err != nil || len(houses) != 1 {
 		t.Fatalf("ParseAvailableHouses() = %#v, %v", houses, err)
 	}
-	if houses[0].Key != "1527" || houses[0].Address != "Main Street, Conference Center, Los Santos 313, San Andreas" {
+	if houses[0].Key != "1345" || houses[0].Address != "Camino del Sol, Richman, Los Santos 806, San Andreas" || houses[0].Price != 742203 {
 		t.Fatalf("unexpected housing record: %#v", houses[0])
 	}
 }

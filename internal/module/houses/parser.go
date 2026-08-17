@@ -153,7 +153,7 @@ func parseHouse(record map[string]any, trustedHousing bool) (House, bool, bool) 
 		house.Longitude = &longitude
 	}
 
-	if !houseSignal && !hasAvailable && !hasStatus {
+	if !trustedHousing && !houseSignal && !hasAvailable && !hasStatus {
 		return House{}, false, false
 	}
 	if containsAny(strings.ToLower(icon), "radar_propertyg") {
@@ -172,7 +172,7 @@ func parseHouse(record map[string]any, trustedHousing bool) (House, bool, bool) 
 	}
 	// A house-only endpoint commonly omits an availability flag. In that case,
 	// the configured endpoint itself defines the set as available inventory.
-	return house, true, houseSignal
+	return house, true, trustedHousing || houseSignal
 }
 
 func houseFromPopup(record map[string]any) (House, bool) {
