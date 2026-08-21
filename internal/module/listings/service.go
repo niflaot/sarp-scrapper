@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	KindHouse    = "house"
-	KindBusiness = "business"
+	KindHouse     = "house"
+	KindBusiness  = "business"
+	KindWarehouse = "warehouse"
 )
 
 type Notifier interface {
@@ -83,8 +84,12 @@ func (s *Service) filterItems(kind string, items []review.Item) []review.Item {
 }
 
 func kindLabel(kind string) string {
-	if kind == KindBusiness {
+	switch kind {
+	case KindBusiness:
 		return "Negocio"
+	case KindWarehouse:
+		return "Almacén"
+	default:
+		return "Propiedad"
 	}
-	return "Propiedad"
 }

@@ -9,7 +9,7 @@ and API paths separately while leaving FlareSolverr as the fallback:
 
 ```caddyfile
 flare.niflaot.dev {
-    @scraper path /panel* /listings* /houses* /businesses* /status
+    @scraper path /panel* /listings* /houses* /businesses* /warehouses* /status
     handle @scraper {
         reverse_proxy mt-sarp-scrapper:3000
     }

@@ -72,7 +72,7 @@ func (h *Handler) review(ctx fiber.Ctx) error { return h.setStatus(ctx, review.S
 
 func (h *Handler) setStatus(ctx fiber.Ctx, status review.Status) error {
 	kind, key := ctx.Params("kind"), ctx.Params("key")
-	if (kind != KindHouse && kind != KindBusiness) || key == "" {
+	if (kind != KindHouse && kind != KindBusiness && kind != KindWarehouse) || key == "" {
 		return ctx.Status(fiber.StatusBadRequest).JSON(ActionErrorResponse{Error: "kind and key are invalid"})
 	}
 	record, err := h.service.SetStatus(kind, key, status)
@@ -130,19 +130,19 @@ const panelHTML = `<!doctype html>
   </style>
 </head>
 <body><main>
-  <div class="top"><div><h1>Disponibles</h1><p class="subtitle">Propiedades y negocios encontrados por SARP.</p></div><div class="count">{{len .Listings}} resultados</div></div>
+  <div class="top"><div><h1>Disponibles</h1><p class="subtitle">Propiedades, negocios y almacenes encontrados por SARP.</p></div><div class="count">{{len .Listings}} resultados</div></div>
   <section class="grid">
   {{range .Listings}}
     <article class="card">
       <div class="head">
-        {{with iconURL .Icon}}<img class="icon" src="{{.}}" alt="">{{else}}<div class="icon placeholder">{{if eq .Kind "business"}}🏪{{else}}🏠{{end}}</div>{{end}}
-        <div class="summary"><h2>{{if eq .Kind "business"}}Negocio {{.Key}}{{else}}Llave {{.Key}}{{end}}</h2><p class="listing-name">{{.Name}}</p><p class="price">{{money .Value}}</p><div class="badges"><span class="badge">{{if eq .Kind "business"}}Negocio{{else}}Propiedad{{end}}</span><span class="badge {{if eq .Status "reviewed"}}reviewed{{end}}">{{if eq .Status "reviewed"}}Revisado{{else}}Nuevo{{end}}</span></div></div>
+        {{with iconURL .Icon}}<img class="icon" src="{{.}}" alt="">{{else}}<div class="icon placeholder">{{if eq .Kind "business"}}🏪{{else if eq .Kind "warehouse"}}🏬{{else}}🏠{{end}}</div>{{end}}
+        <div class="summary"><h2>{{if eq .Kind "business"}}Negocio {{.Key}}{{else if eq .Kind "warehouse"}}Almacén {{.Key}}{{else}}Llave {{.Key}}{{end}}</h2><p class="listing-name">{{.Name}}</p><p class="price">{{money .Value}}</p><div class="badges"><span class="badge">{{if eq .Kind "business"}}Negocio{{else if eq .Kind "warehouse"}}Almacén{{else}}Propiedad{{end}}</span><span class="badge {{if eq .Status "reviewed"}}reviewed{{end}}">{{if eq .Status "reviewed"}}Revisado{{else}}Nuevo{{end}}</span></div></div>
       </div>
       <div class="actions">
         <form method="post" action="/listings/{{.Kind}}/{{.Key}}/review"><button class="button review" {{if eq .Status "reviewed"}}disabled{{end}}>Revisar</button></form>
         <form method="post" action="/listings/{{.Kind}}/{{.Key}}/ignore"><button class="button ignore">Ignorar</button></form>
       </div>
     </article>
-  {{else}}<div class="empty">No hay propiedades o negocios disponibles.</div>{{end}}
+  {{else}}<div class="empty">No hay propiedades, negocios o almacenes disponibles.</div>{{end}}
   </section>
 </main></body></html>`

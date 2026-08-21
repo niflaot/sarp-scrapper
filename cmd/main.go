@@ -6,6 +6,7 @@ import (
 	"github.com/niflaot/sarp-scrapper/internal/module/houses"
 	"github.com/niflaot/sarp-scrapper/internal/module/listings"
 	"github.com/niflaot/sarp-scrapper/internal/module/status"
+	"github.com/niflaot/sarp-scrapper/internal/module/warehouses"
 	"github.com/niflaot/sarp-scrapper/pkg/config"
 	"github.com/niflaot/sarp-scrapper/pkg/discord"
 	"github.com/niflaot/sarp-scrapper/pkg/logger"
@@ -29,6 +30,7 @@ func main() {
 		auth.Module,
 		houses.Module,
 		businesses.Module,
+		warehouses.Module,
 		status.Module,
 		fx.WithLogger(newFxEventLogger),
 	).Run()

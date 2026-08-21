@@ -6,7 +6,8 @@ configuración con `caarlos0/env` + `godotenv`, OpenAPI generado y Scalar.
 ## Flujo
 
 Cuando `API_TOKEN` está configurado, el servicio usa la API oficial y consulta
-`GET https://api.sarp.es/api/map/icons` y `GET /api/businesses/available`. Si Cloudflare presenta un desafío y
+`GET https://api.sarp.es/api/map/icons` para casas y almacenes, y
+`GET /api/businesses/available` para negocios. Si Cloudflare presenta un desafío y
 `SARP_FLARESOLVERR_URL` está configurado, solicita a FlareSolverr una cookie de
 clearance y repite la llamada con esa cookie, el mismo `User-Agent` y el token
 Bearer. El token nunca se envía a FlareSolverr. Si la API sigue fallando, abre
@@ -48,6 +49,7 @@ Variables principales:
 | `LISTINGS_STATE_FILE` | `.cache/listings-state.json` | Archivo JSON persistente con decisiones y notificaciones. |
 | `LISTINGS_HOUSE_MIN_VALUE` | `500000` | Valor mínimo inclusivo para mostrar y notificar propiedades. |
 | `LISTINGS_BUSINESS_MIN_VALUE` | `100000` | Valor mínimo inclusivo para mostrar y notificar negocios. |
+| `LISTINGS_WAREHOUSE_MIN_VALUE` | `100000` | Valor mínimo inclusivo para mostrar y notificar almacenes. |
 | `DISCORD_WEBHOOK_URL` | vacío | Webhook entrante para nuevos negocios y propiedades. |
 | `DISCORD_WEBHOOK_TIMEOUT` | `10s` | Timeout de cada notificación. |
 
@@ -97,7 +99,9 @@ También se puede enviar el código desde el primer POST:
 | `POST /houses/refresh` | Ejecuta un scrape sincronizado. |
 | `GET /businesses` | Último snapshot de negocios disponibles. |
 | `POST /businesses/refresh` | Actualiza los negocios sincronizadamente. |
-| `GET /listings` | Propiedades y negocios visibles con estado de revisión. |
+| `GET /warehouses` | Último snapshot de almacenes disponibles. |
+| `POST /warehouses/refresh` | Actualiza los almacenes sincronizadamente. |
+| `GET /listings` | Propiedades, negocios y almacenes visibles con estado de revisión. |
 | `POST /listings/:kind/:key/review` | Marca como revisado y lo mantiene visible. |
 | `POST /listings/:kind/:key/ignore` | Lo oculta permanentemente. |
 | `GET /panel` | Panel HTML para revisar o ignorar resultados. |
@@ -120,10 +124,10 @@ FlareSolverr.
 
 ## Panel, caché y Discord
 
-Cada resultado se guarda por tipo (`house` o `business`) y llave en el archivo
+Cada resultado se guarda por tipo (`house`, `business` o `warehouse`) y llave en el archivo
 configurado por `LISTINGS_STATE_FILE`. Un resultado nuevo empieza como
 `pending`; `review` lo deja visible con la etiqueta de revisado e `ignore` lo
-elimina de `/panel`, `/listings`, `/houses` o `/businesses`, incluso si vuelve a
+elimina de `/panel`, `/listings`, `/houses`, `/businesses` o `/warehouses`, incluso si vuelve a
 aparecer en scrapes posteriores.
 
 Cuando `DISCORD_WEBHOOK_URL` está configurado, cada resultado nuevo genera una

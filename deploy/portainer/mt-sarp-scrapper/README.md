@@ -17,16 +17,18 @@ The named volume `mt-sarp-scrapper-data` stores review decisions in
 not remove ignored/reviewed state. Do not delete the volume unless you explicitly
 want to reset all decisions and notification history.
 
-`LISTINGS_HOUSE_MIN_VALUE` and `LISTINGS_BUSINESS_MIN_VALUE` are inclusive
+`LISTINGS_HOUSE_MIN_VALUE`, `LISTINGS_BUSINESS_MIN_VALUE`, and
+`LISTINGS_WAREHOUSE_MIN_VALUE` are inclusive
 minimums. Results below them are omitted from the APIs, panel, cache reconciliation,
-and Discord notifications. Their defaults are `500000` and `100000` respectively.
+and Discord notifications. Their defaults are `500000`, `100000`, and `100000`
+respectively.
 
 Expose the panel through the existing Flare domain while keeping `/v1` and every
 non-scraper path routed to FlareSolverr:
 
 ```caddyfile
 flare.niflaot.dev {
-    @scraper path /panel /panel/* /listings /listings/* /houses /houses/* /businesses /businesses/* /status
+    @scraper path /panel /panel/* /listings /listings/* /houses /houses/* /businesses /businesses/* /warehouses /warehouses/* /status
     handle @scraper {
         reverse_proxy mt-sarp-scrapper:3000
     }

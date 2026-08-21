@@ -160,6 +160,8 @@ func (s *Store) MinimumValue(kind string) int64 {
 		return s.config.HouseMinValue
 	case "business":
 		return s.config.BusinessMinValue
+	case "warehouse":
+		return s.config.WarehouseMinValue
 	default:
 		return 0
 	}

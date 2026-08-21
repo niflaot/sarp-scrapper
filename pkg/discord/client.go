@@ -136,8 +136,12 @@ func escapeMarkdown(value string) string {
 }
 
 func newListingLabel(kind string) string {
-	if strings.EqualFold(kind, "Propiedad") {
+	switch {
+	case strings.EqualFold(kind, "Propiedad"):
 		return "Nueva propiedad"
+	case strings.EqualFold(kind, "Almacén"):
+		return "Nuevo almacén"
+	default:
+		return "Nuevo negocio"
 	}
-	return "Nuevo negocio"
 }

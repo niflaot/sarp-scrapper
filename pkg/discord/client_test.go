@@ -42,3 +42,9 @@ func TestClientDisabled(t *testing.T) {
 		t.Fatalf("NotifyListing() error = %v", err)
 	}
 }
+
+func TestNewListingLabelWarehouse(t *testing.T) {
+	if label := newListingLabel("Almacén"); label != "Nuevo almacén" {
+		t.Fatalf("newListingLabel() = %q", label)
+	}
+}
