@@ -16,7 +16,7 @@ const (
 )
 
 type Client interface {
-	Query(context.Context, string, url.Values) ([]byte, error)
+	QueryProvider(context.Context, string, string, url.Values) ([]byte, error)
 }
 
 type Service struct{ client Client }
@@ -45,5 +45,5 @@ func (s *Service) Query(ctx context.Context, request Request) ([]byte, error) {
 			values.Add(key, value)
 		}
 	}
-	return s.client.Query(ctx, request.Path, values)
+	return s.client.QueryProvider(ctx, request.Provider, request.Path, values)
 }

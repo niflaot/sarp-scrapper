@@ -185,6 +185,39 @@ func TestAPIClientQuery(t *testing.T) {
 	}
 }
 
+func TestAPIClientQueryGTARolProvider(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/api/businesses/1995" {
+			t.Errorf("path = %q", request.URL.Path)
+		}
+		if got := request.Header.Get("Authorization"); got != "Bearer sarp_test" {
+			t.Errorf("Authorization = %q", got)
+		}
+		if _, err := request.Cookie("cf_clearance"); err == nil {
+			t.Error("GTA Rol request received SARP clearance cookie")
+		}
+		response.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(response, `{"payload":{"id":1995,"name":"Test"}}`)
+	}))
+	defer server.Close()
+	client := NewAPIClient(Config{
+		APIToken: "sarp_test", APIBaseURL: "https://api.sarp.es/api", GTARolAPIBaseURL: server.URL + "/api",
+		APITimeout: time.Second, APIUserAgent: "test-client/1.0",
+	}, zap.NewNop())
+	client.storeClearance(&clearance{UserAgent: "clearance-agent", Cookies: []clearanceCookie{{Name: "cf_clearance", Value: "secret"}}})
+	body, err := client.QueryProvider(context.Background(), "gta-rol", "/businesses/1995", nil)
+	if err != nil || !strings.Contains(string(body), "1995") {
+		t.Fatalf("QueryProvider() = %q, %v", body, err)
+	}
+}
+
+func TestAPIClientQueryRejectsUnknownProvider(t *testing.T) {
+	client := NewAPIClient(Config{APIToken: "sarp_test", APITimeout: time.Second}, zap.NewNop())
+	if _, err := client.QueryProvider(context.Background(), "external", "/profile", nil); !errors.Is(err, ErrInvalidAPIProvider) {
+		t.Fatalf("QueryProvider() error = %v", err)
+	}
+}
+
 func TestAPIClientQueryRejectsUnsafePaths(t *testing.T) {
 	client := NewAPIClient(Config{APIToken: "sarp_test", APIBaseURL: "https://api.sarp.es/api", APITimeout: time.Second}, zap.NewNop())
 	for _, path := range []string{"https://example.com/steal", "//example.com/steal", "/../steal", "/%2e%2e/steal", "/map/icons?redirect=https://example.com"} {

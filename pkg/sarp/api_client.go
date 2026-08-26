@@ -19,6 +19,7 @@ import (
 var (
 	ErrAPITokenMissing        = errors.New("SARP API token is not configured")
 	ErrInvalidAPIPath         = errors.New("SARP API path is invalid")
+	ErrInvalidAPIProvider     = errors.New("SARP API provider is invalid")
 	ErrAPICloudflareChallenge = errors.New("SARP API request was blocked by a Cloudflare challenge")
 	ErrFlareSolverrFailed     = errors.New("FlareSolverr could not establish SARP clearance")
 )
@@ -92,6 +93,31 @@ func (c *APIClient) FetchBusinesses(ctx context.Context) ([]byte, error) {
 // to another host.
 func (c *APIClient) Query(ctx context.Context, path string, query url.Values) ([]byte, error) {
 	return c.fetch(ctx, path, query, "API query")
+}
+
+// QueryProvider selects one of the fixed SARP API origins. The gta-rol
+// provider uses the bearer token but never receives Cloudflare clearance
+// cookies obtained for api.sarp.es.
+func (c *APIClient) QueryProvider(ctx context.Context, provider, path string, query url.Values) ([]byte, error) {
+	switch provider {
+	case "", "sarp":
+		return c.Query(ctx, path, query)
+	case "gta-rol":
+		if c.config.APIToken == "" {
+			return nil, c.fail(ErrAPITokenMissing)
+		}
+		endpoint, err := apiEndpoint(c.config.GTARolAPIBaseURL, path, query)
+		if err != nil {
+			return nil, err
+		}
+		body, err := c.fetchEndpoint(ctx, endpoint, nil)
+		if err != nil {
+			return nil, c.fail(err)
+		}
+		return c.succeed(body, "GTA Rol API query")
+	default:
+		return nil, fmt.Errorf("%w: %q", ErrInvalidAPIProvider, provider)
+	}
 }
 
 func (c *APIClient) fetch(ctx context.Context, path string, query url.Values, label string) ([]byte, error) {

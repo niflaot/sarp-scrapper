@@ -12,6 +12,7 @@ type Config struct {
 	Enabled                 bool          `env:"SARP_SCRAPER_ENABLED" envDefault:"false"`
 	APIToken                string        `env:"API_TOKEN"`
 	APIBaseURL              string        `env:"SARP_API_BASE_URL" envDefault:"https://api.sarp.es/api"`
+	GTARolAPIBaseURL        string        `env:"SARP_GTA_ROL_API_BASE_URL" envDefault:"https://api.gta-rol.com/api"`
 	APITimeout              time.Duration `env:"SARP_API_TIMEOUT" envDefault:"30s"`
 	APIUserAgent            string        `env:"SARP_API_USER_AGENT" envDefault:"sarp-scrapper/1.0"`
 	FlareSolverrURL         string        `env:"SARP_FLARESOLVERR_URL"`
@@ -52,6 +53,9 @@ func (c Config) Validate() error {
 		return fmt.Errorf("SARP_API_TIMEOUT must be greater than zero")
 	}
 	if err := validateHTTPURL("SARP_API_BASE_URL", c.APIBaseURL); err != nil {
+		return err
+	}
+	if err := validateHTTPURL("SARP_GTA_ROL_API_BASE_URL", c.GTARolAPIBaseURL); err != nil {
 		return err
 	}
 	if c.APIUserAgent == "" {

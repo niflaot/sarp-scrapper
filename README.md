@@ -119,9 +119,19 @@ curl -X POST http://127.0.0.1:8080/api/query \
   -d '{"path":"/character/search","query":{"name":["John"]}}'
 ```
 
+Para las rutas documentadas en `api.gta-rol.com`, selecciona el proveedor fijo
+`gta-rol`; utiliza el mismo `API_TOKEN` pero no comparte cookies de clearance
+con `api.sarp.es`:
+
+```sh
+curl -X POST http://127.0.0.1:8080/api/query \
+  -H 'Content-Type: application/json' \
+  -d '{"provider":"gta-rol","path":"/businesses/1995"}'
+```
+
 No acepta URLs absolutas, redirecciones de destino ni métodos de escritura. Un
-token de `api.sarp.es` no se reenvía a `api.gta-rol.com`; ese servicio requiere
-su propia credencial.
+El proveedor se selecciona de una lista fija; nunca se aceptan hosts enviados
+por el cliente.
 
 ## Límites deliberados
 

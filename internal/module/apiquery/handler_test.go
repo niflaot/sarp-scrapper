@@ -15,14 +15,15 @@ import (
 )
 
 type clientStub struct {
-	path  string
-	query url.Values
-	body  []byte
-	err   error
+	provider string
+	path     string
+	query    url.Values
+	body     []byte
+	err      error
 }
 
-func (c *clientStub) Query(_ context.Context, path string, query url.Values) ([]byte, error) {
-	c.path, c.query = path, query
+func (c *clientStub) QueryProvider(_ context.Context, provider, path string, query url.Values) ([]byte, error) {
+	c.provider, c.path, c.query = provider, path, query
 	return c.body, c.err
 }
 
@@ -30,7 +31,7 @@ func TestQueryRoute(t *testing.T) {
 	client := &clientStub{body: []byte(`{"payload":[{"id":14381}]}`)}
 	httpServer := server.New(server.Config{Environment: server.EnvironmentDevelopment, BindHost: "127.0.0.1", BindPort: 8080}, zap.NewNop())
 	Register(httpServer, NewHandler(NewService(client)))
-	request, err := http.NewRequest(http.MethodPost, "/api/query", bytes.NewBufferString(`{"path":"/character/search","query":{"name":["John Doe"]}}`))
+	request, err := http.NewRequest(http.MethodPost, "/api/query", bytes.NewBufferString(`{"provider":"gta-rol","path":"/businesses/1995"}`))
 	if err != nil {
 		t.Fatalf("create request: %v", err)
 	}
@@ -40,8 +41,8 @@ func TestQueryRoute(t *testing.T) {
 		t.Fatalf("POST /api/query: %v", err)
 	}
 	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK || client.path != "/character/search" || client.query.Get("name") != "John Doe" {
-		t.Fatalf("status/path/query = %d/%q/%q", response.StatusCode, client.path, client.query.Get("name"))
+	if response.StatusCode != http.StatusOK || client.provider != "gta-rol" || client.path != "/businesses/1995" {
+		t.Fatalf("status/provider/path = %d/%q/%q", response.StatusCode, client.provider, client.path)
 	}
 }
 
@@ -55,6 +56,7 @@ func TestQueryRouteErrors(t *testing.T) {
 		{name: "invalid body", body: `{`, want: http.StatusBadRequest},
 		{name: "missing path", body: `{}`, want: http.StatusBadRequest},
 		{name: "unsafe path", body: `{"path":"https://example.com"}`, err: sarp.ErrInvalidAPIPath, want: http.StatusBadRequest},
+		{name: "unsafe provider", body: `{"provider":"example","path":"/account/profile"}`, err: sarp.ErrInvalidAPIProvider, want: http.StatusBadRequest},
 		{name: "missing token", body: `{"path":"/account/profile"}`, err: sarp.ErrAPITokenMissing, want: http.StatusServiceUnavailable},
 		{name: "upstream", body: `{"path":"/account/profile"}`, err: errors.New("upstream failed"), want: http.StatusBadGateway},
 	}

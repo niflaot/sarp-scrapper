@@ -8,7 +8,7 @@ import (
 func validConfig() Config {
 	return Config{
 		Enabled: true, Email: "user@example.com", Password: "password",
-		APIBaseURL: "https://api.sarp.es/api", APITimeout: time.Second, APIUserAgent: "test-client/1.0",
+		APIBaseURL: "https://api.sarp.es/api", GTARolAPIBaseURL: "https://api.gta-rol.com/api", APITimeout: time.Second, APIUserAgent: "test-client/1.0",
 		FlareSolverrTimeout: time.Second,
 		LoginURL:            "https://ucp.sarp.es/", MapURL: "https://ucp.sarp.es/app/ucp/map",
 		ProfileDir: ".test-browser", LoginTimeout: time.Second, MapSettleTime: time.Second,
@@ -32,6 +32,7 @@ func TestConfigValidate(t *testing.T) {
 		func(c *Config) { c.Jitter = c.Interval }, func(c *Config) { c.LoginTimeout = 0 },
 		func(c *Config) { c.MapSettleTime = -1 }, func(c *Config) { c.TwoFactorSelector = "" },
 		func(c *Config) { c.APITimeout = 0 }, func(c *Config) { c.APIBaseURL = "relative" },
+		func(c *Config) { c.GTARolAPIBaseURL = "relative" },
 		func(c *Config) { c.APIUserAgent = "" },
 		func(c *Config) { c.FlareSolverrTimeout = 0 }, func(c *Config) { c.FlareSolverrURL = "relative" },
 	}

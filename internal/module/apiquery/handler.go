@@ -20,8 +20,8 @@ func Register(server *server.Server, handler *Handler) {
 		option.Tags("api"),
 		option.Request(new(Request),
 			option.ContentRequired(),
-			option.ContentDescription("Only relative paths below SARP_API_BASE_URL are accepted; absolute URLs and traversal are rejected."),
-			option.ContentExample(Request{Path: "/character/search", Query: map[string][]string{"name": {"John"}}}),
+			option.ContentDescription("Select sarp or gta-rol and provide a relative path. Absolute URLs and traversal are rejected."),
+			option.ContentExample(Request{Provider: "gta-rol", Path: "/businesses/1995"}),
 		),
 		option.Response(fiber.StatusOK, new(map[string]any)),
 		option.Response(fiber.StatusBadRequest, new(ErrorResponse)),
@@ -38,7 +38,7 @@ func (h *Handler) query(ctx fiber.Ctx) error {
 	body, err := h.service.Query(ctx.Context(), request)
 	if err != nil {
 		status := fiber.StatusBadGateway
-		if errors.Is(err, ErrInvalidRequest) || errors.Is(err, sarp.ErrInvalidAPIPath) {
+		if errors.Is(err, ErrInvalidRequest) || errors.Is(err, sarp.ErrInvalidAPIPath) || errors.Is(err, sarp.ErrInvalidAPIProvider) {
 			status = fiber.StatusBadRequest
 		}
 		if errors.Is(err, sarp.ErrAPITokenMissing) || errors.Is(err, sarp.ErrAPICloudflareChallenge) || errors.Is(err, sarp.ErrFlareSolverrFailed) {
