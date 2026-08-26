@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/niflaot/sarp-scrapper/internal/module/apiquery"
 	"github.com/niflaot/sarp-scrapper/internal/module/auth"
 	"github.com/niflaot/sarp-scrapper/internal/module/businesses"
 	"github.com/niflaot/sarp-scrapper/internal/module/houses"
@@ -27,6 +28,7 @@ func main() {
 		server.Module,
 		sarp.Module,
 		listings.Module,
+		apiquery.Module,
 		auth.Module,
 		houses.Module,
 		businesses.Module,

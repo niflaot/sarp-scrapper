@@ -93,6 +93,7 @@ También se puede enviar el código desde el primer POST:
 | Ruta | Descripción |
 | --- | --- |
 | `GET /status` | `available` o `pending`. |
+| `POST /api/query` | Ejecuta un `GET` autenticado contra una ruta relativa de `SARP_API_BASE_URL`. |
 | `POST /auth/login` | Abre Chrome, envía credenciales y opcionalmente 2FA. |
 | `POST /auth/2fa` | Completa un desafío pendiente. |
 | `GET /houses` | Último snapshot de casas disponibles. |
@@ -107,6 +108,20 @@ También se puede enviar el código desde el primer POST:
 | `GET /panel` | Panel HTML para revisar o ignorar resultados. |
 | `GET /docs` | Scalar, sólo en desarrollo. |
 | `GET /openapi.json` | OpenAPI, sólo en desarrollo. |
+
+Consulta cualquier ruta `GET` de la API oficial sin exponer el token en el
+body. La ruta debe ser relativa al `SARP_API_BASE_URL` configurado y los query
+params se envían por separado:
+
+```sh
+curl -X POST http://127.0.0.1:8080/api/query \
+  -H 'Content-Type: application/json' \
+  -d '{"path":"/character/search","query":{"name":["John"]}}'
+```
+
+No acepta URLs absolutas, redirecciones de destino ni métodos de escritura. Un
+token de `api.sarp.es` no se reenvía a `api.gta-rol.com`; ese servicio requiere
+su propia credencial.
 
 ## Límites deliberados
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +18,7 @@ import (
 
 var (
 	ErrAPITokenMissing        = errors.New("SARP API token is not configured")
+	ErrInvalidAPIPath         = errors.New("SARP API path is invalid")
 	ErrAPICloudflareChallenge = errors.New("SARP API request was blocked by a Cloudflare challenge")
 	ErrFlareSolverrFailed     = errors.New("FlareSolverr could not establish SARP clearance")
 )
@@ -69,25 +71,38 @@ func NewAPIClient(config Config, log *zap.Logger) *APIClient {
 		state:  session.StatePending,
 		httpClient: &http.Client{
 			Timeout: config.APITimeout,
+			CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
 		},
 		flareClient: &http.Client{Timeout: config.FlareSolverrTimeout + 5*time.Second},
 	}
 }
 
 func (c *APIClient) FetchMap(ctx context.Context) ([]byte, error) {
-	return c.fetch(ctx, "/map/icons", "map icons")
+	return c.fetch(ctx, "/map/icons", nil, "map icons")
 }
 
 func (c *APIClient) FetchBusinesses(ctx context.Context) ([]byte, error) {
-	return c.fetch(ctx, "/businesses/available", "available businesses")
+	return c.fetch(ctx, "/businesses/available", nil, "available businesses")
 }
 
-func (c *APIClient) fetch(ctx context.Context, path, label string) ([]byte, error) {
+// Query performs an authenticated GET below the configured SARP API base URL.
+// Absolute URLs are deliberately rejected so the bearer token cannot be sent
+// to another host.
+func (c *APIClient) Query(ctx context.Context, path string, query url.Values) ([]byte, error) {
+	return c.fetch(ctx, path, query, "API query")
+}
+
+func (c *APIClient) fetch(ctx context.Context, path string, query url.Values, label string) ([]byte, error) {
 	if c.config.APIToken == "" {
 		return nil, c.fail(ErrAPITokenMissing)
 	}
 
-	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") + path
+	endpoint, err := apiEndpoint(c.config.APIBaseURL, path, query)
+	if err != nil {
+		return nil, err
+	}
 	activeClearance := c.currentClearance()
 	body, err := c.fetchEndpoint(ctx, endpoint, activeClearance)
 	if err == nil {
@@ -260,6 +275,37 @@ func (c *APIClient) Status() session.State {
 	c.stateMu.RLock()
 	defer c.stateMu.RUnlock()
 	return c.state
+}
+
+func apiEndpoint(baseURL, relativePath string, query url.Values) (string, error) {
+	if relativePath == "" || !strings.HasPrefix(relativePath, "/") || strings.HasPrefix(relativePath, "//") {
+		return "", fmt.Errorf("%w: path must start with one slash", ErrInvalidAPIPath)
+	}
+	if strings.ContainsAny(relativePath, "?#\\") {
+		return "", fmt.Errorf("%w: put parameters in the query field", ErrInvalidAPIPath)
+	}
+	decodedPath, err := url.PathUnescape(relativePath)
+	if err != nil || strings.Contains(decodedPath, "\\") || hasTraversalSegment(decodedPath) {
+		return "", fmt.Errorf("%w: path traversal is not allowed", ErrInvalidAPIPath)
+	}
+	base, err := url.Parse(baseURL)
+	if err != nil || base.Scheme == "" || base.Host == "" {
+		return "", fmt.Errorf("%w: configured base URL is invalid", ErrInvalidAPIPath)
+	}
+	base.Path = strings.TrimRight(base.Path, "/") + "/" + strings.TrimLeft(decodedPath, "/")
+	base.RawPath = ""
+	base.RawQuery = query.Encode()
+	base.Fragment = ""
+	return base.String(), nil
+}
+
+func hasTraversalSegment(value string) bool {
+	for _, segment := range strings.Split(value, "/") {
+		if segment == "." || segment == ".." {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *APIClient) fail(err error) error {

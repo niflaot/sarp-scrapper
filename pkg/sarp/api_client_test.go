@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -156,6 +157,66 @@ func TestAPIClientFetchBusinesses(t *testing.T) {
 	body, err := client.FetchBusinesses(context.Background())
 	if err != nil || !strings.Contains(string(body), "businesses") {
 		t.Fatalf("FetchBusinesses() = %q, %v", body, err)
+	}
+}
+
+func TestAPIClientQuery(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/api/character/search" {
+			t.Errorf("path = %q", request.URL.Path)
+		}
+		if got := request.URL.Query().Get("name"); got != "John Doe" {
+			t.Errorf("name = %q", got)
+		}
+		if got := request.Header.Get("Authorization"); got != "Bearer sarp_test" {
+			t.Errorf("Authorization = %q", got)
+		}
+		response.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(response, `{"payload":[{"id":14381}]}`)
+	}))
+	defer server.Close()
+	client := NewAPIClient(Config{
+		APIToken: "sarp_test", APIBaseURL: server.URL + "/api",
+		APITimeout: time.Second, APIUserAgent: "test-client/1.0",
+	}, zap.NewNop())
+	body, err := client.Query(context.Background(), "/character/search", url.Values{"name": {"John Doe"}})
+	if err != nil || !strings.Contains(string(body), "14381") {
+		t.Fatalf("Query() = %q, %v", body, err)
+	}
+}
+
+func TestAPIClientQueryRejectsUnsafePaths(t *testing.T) {
+	client := NewAPIClient(Config{APIToken: "sarp_test", APIBaseURL: "https://api.sarp.es/api", APITimeout: time.Second}, zap.NewNop())
+	for _, path := range []string{"https://example.com/steal", "//example.com/steal", "/../steal", "/%2e%2e/steal", "/map/icons?redirect=https://example.com"} {
+		t.Run(path, func(t *testing.T) {
+			if _, err := client.Query(context.Background(), path, nil); !errors.Is(err, ErrInvalidAPIPath) {
+				t.Fatalf("Query(%q) error = %v", path, err)
+			}
+		})
+	}
+}
+
+func TestAPIClientQueryDoesNotFollowRedirects(t *testing.T) {
+	var destinationCalls atomic.Int32
+	destination := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
+		destinationCalls.Add(1)
+		_, _ = fmt.Fprint(response, `{}`)
+	}))
+	defer destination.Close()
+	source := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
+		response.Header().Set("Location", destination.URL)
+		response.WriteHeader(http.StatusFound)
+	}))
+	defer source.Close()
+	client := NewAPIClient(Config{
+		APIToken: "sarp_test", APIBaseURL: source.URL,
+		APITimeout: time.Second, APIUserAgent: "test-client/1.0",
+	}, zap.NewNop())
+	if _, err := client.Query(context.Background(), "/redirect", nil); err == nil || !strings.Contains(err.Error(), "HTTP 302") {
+		t.Fatalf("Query() error = %v", err)
+	}
+	if destinationCalls.Load() != 0 {
+		t.Fatalf("redirect destination calls = %d", destinationCalls.Load())
 	}
 }
 
