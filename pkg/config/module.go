@@ -2,4 +2,4 @@ package config
 
 import "go.uber.org/fx"
 
-var Module = fx.Module("config", fx.Provide(Load, Server, Logger, SARP, Discord, Review))
+var Module = fx.Module("config", fx.Provide(Load, Server, Logger, SARP, Discord, Review, Presence))

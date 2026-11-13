@@ -10,6 +10,7 @@ type Config struct {
 	WebhookURL string        `env:"DISCORD_WEBHOOK_URL"`
 	Timeout    time.Duration `env:"DISCORD_WEBHOOK_TIMEOUT" envDefault:"10s"`
 	Username   string        `env:"DISCORD_WEBHOOK_USERNAME" envDefault:"SARP Scrapper"`
+	BotToken   string        `env:"DISCORD_BOT_TOKEN"`
 }
 
 func (c Config) Validate() error {

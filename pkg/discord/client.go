@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 
 	"go.uber.org/zap"
 )
@@ -28,10 +29,17 @@ type Client struct {
 	config     Config
 	log        *zap.Logger
 	httpClient *http.Client
+	apiBaseURL string
+
+	dmMu       sync.Mutex
+	dmChannels map[string]string
 }
 
 func NewClient(config Config, log *zap.Logger) *Client {
-	return &Client{config: config, log: log, httpClient: &http.Client{Timeout: config.Timeout}}
+	return &Client{
+		config: config, log: log, httpClient: &http.Client{Timeout: config.Timeout},
+		apiBaseURL: defaultAPIBaseURL, dmChannels: make(map[string]string),
+	}
 }
 
 func (c *Client) Enabled() bool { return c.config.WebhookURL != "" }

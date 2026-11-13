@@ -52,6 +52,10 @@ Variables principales:
 | `LISTINGS_WAREHOUSE_MIN_VALUE` | `100000` | Valor mínimo inclusivo para mostrar y notificar almacenes. |
 | `DISCORD_WEBHOOK_URL` | vacío | Webhook entrante para nuevos negocios y propiedades. |
 | `DISCORD_WEBHOOK_TIMEOUT` | `10s` | Timeout de cada notificación. |
+| `DISCORD_BOT_TOKEN` | vacío | Token de un bot de Discord para enviar mensajes directos (avisos de conexión). |
+| `PRESENCE_WATCH_NAMES` | vacío | Personajes a vigilar, separados por coma. Vacío desactiva el aviso. |
+| `PRESENCE_DISCORD_USER_ID` | vacío | ID de Discord que recibe el aviso. Obligatorio si hay personajes. |
+| `PRESENCE_POLL_INTERVAL` | `60s` | Cada cuánto consulta quién está conectado (mínimo `10s`). |
 
 El resto de URLs, selectores, timeouts y opciones del navegador usan defaults
 internos; no es necesario declararlos en `.env`.
@@ -146,6 +150,28 @@ pedir a FlareSolverr cookies y `User-Agent`; después hace la llamada autenticad
 desde el propio proceso. Por eso el scraper y FlareSolverr deben compartir la
 misma IP pública de salida. El token Bearer no forma parte de la solicitud a
 FlareSolverr.
+
+## Avisos de conexión de personajes
+
+Con `PRESENCE_WATCH_NAMES` configurado, el servicio consulta cada
+`PRESENCE_POLL_INTERVAL` `GET /public/global-metrics/online` (con el mismo
+cliente, token y FlareSolverr que `/api/query`) y avisa cuando uno de esos
+personajes pasa de desconectado a conectado:
+
+- Mensaje directo a `PRESENCE_DISCORD_USER_ID`, si hay `DISCORD_BOT_TOKEN`. El bot
+  debe compartir servidor con esa cuenta y ella debe aceptar mensajes directos.
+- Mención `<@id>` por el webhook, si hay `DISCORD_WEBHOOK_URL`.
+
+Basta con que uno de los dos canales entregue el aviso. Al arrancar sólo se
+registra quién ya está conectado, sin avisar. Una consulta fallida no cuenta como
+desconexión, y un aviso fallido se reintenta en el siguiente ciclo. El estado
+vive en memoria.
+
+```sh
+PRESENCE_WATCH_NAMES=Harper_Brooks,Juana_Gonzales,Yolandi_Bartlett,Orla_Murphy
+PRESENCE_DISCORD_USER_ID=278642935426449418
+DISCORD_BOT_TOKEN=<token del bot>
+```
 
 ## Panel, caché y Discord
 
