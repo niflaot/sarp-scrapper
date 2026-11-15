@@ -11,3 +11,16 @@ type Character struct {
 type onlineResponse struct {
 	Payload []Character `json:"payload"`
 }
+
+// Account is one entry of the home online-users payload.
+type Account struct {
+	ID         int64  `json:"accountId"`
+	Name       string `json:"accountName"`
+	AdminLevel int    `json:"adminLevel"`
+}
+
+type onlineAccountsResponse struct {
+	Payload *struct {
+		Users []Account `json:"users"`
+	} `json:"payload"`
+}

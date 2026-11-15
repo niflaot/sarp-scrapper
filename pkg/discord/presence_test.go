@@ -98,3 +98,15 @@ func TestPresenceEnabled(t *testing.T) {
 		t.Fatal("PresenceEnabled() must be true with a bot token")
 	}
 }
+
+func TestNotifyAccountPresence(t *testing.T) {
+	server, requests := recordingServer(t, nil)
+	client := presenceClient(server, Config{BotToken: "secret"})
+	if err := client.NotifyAccountPresence(t.Context(), AccountNotice{RecipientID: "278642935426449418", AccountID: 13297, AccountName: "var_ky", AdminLevel: 3}); err != nil {
+		t.Fatalf("NotifyAccountPresence() error = %v", err)
+	}
+	got := requests()
+	if len(got) != 2 || !strings.Contains(got[1].body, `var\\_ky`) || !strings.Contains(got[1].body, "13297") || !strings.Contains(got[1].body, "admin nivel 3") {
+		t.Fatalf("unexpected requests: %#v", got)
+	}
+}

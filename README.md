@@ -56,6 +56,8 @@ Variables principales:
 | `PRESENCE_WATCH_NAMES` | vacío | Personajes a vigilar, separados por coma. Vacío desactiva el aviso. |
 | `PRESENCE_DISCORD_USER_ID` | vacío | ID de Discord que recibe el aviso. Obligatorio si hay personajes. |
 | `PRESENCE_POLL_INTERVAL` | `60s` | Cada cuánto consulta quién está conectado (mínimo `10s`). |
+| `PRESENCE_WATCH_ACCOUNT_IDS` | vacío | IDs de cuenta SARP a vigilar, separados por coma. Vacío desactiva el aviso. |
+| `PRESENCE_ACCOUNT_POLL_INTERVAL` | `5m` | Cada cuánto consulta `/home/online-users` (mínimo `10s`). |
 
 El resto de URLs, selectores, timeouts y opciones del navegador usan defaults
 internos; no es necesario declararlos en `.env`.
@@ -166,6 +168,20 @@ Basta con que uno de los dos canales entregue el aviso. Al arrancar sólo se
 registra quién ya está conectado, sin avisar. Una consulta fallida no cuenta como
 desconexión, y un aviso fallido se reintenta en el siguiente ciclo. El estado
 vive en memoria.
+
+### Cuentas
+
+Con `PRESENCE_WATCH_ACCOUNT_IDS` configurado, cada `PRESENCE_ACCOUNT_POLL_INTERVAL`
+consulta `GET /home/online-users` y avisa por los mismos canales cuando una de esas
+cuentas aparece en `payload.users`. Esa lista cubre una ventana de actividad
+(`windowHours`, 4 al escribir esto), no sólo sesiones abiertas: una cuenta que ya
+está en la lista no vuelve a avisar hasta que salga de ella y regrese.
+
+```sh
+PRESENCE_WATCH_ACCOUNT_IDS=13297,15316
+```
+
+Ambos avisos comparten `PRESENCE_DISCORD_USER_ID`, `DISCORD_BOT_TOKEN` y el webhook.
 
 ```sh
 PRESENCE_WATCH_NAMES=Harper_Brooks,Juana_Gonzales,Yolandi_Bartlett,Orla_Murphy

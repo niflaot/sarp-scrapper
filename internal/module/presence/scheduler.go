@@ -10,19 +10,32 @@ import (
 	"go.uber.org/zap"
 )
 
+type job struct {
+	name     string
+	interval time.Duration
+	check    func(context.Context) error
+}
+
+// Scheduler runs one polling loop per enabled watcher.
 type Scheduler struct {
-	config   presence.Config
-	service  *Service
+	jobs     []job
 	notifier Notifier
 	log      *zap.Logger
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
-	done   chan struct{}
+	wg     sync.WaitGroup
 }
 
-func NewScheduler(config presence.Config, service *Service, notifier Notifier, log *zap.Logger) *Scheduler {
-	return &Scheduler{config: config, service: service, notifier: notifier, log: log}
+func NewScheduler(config presence.Config, characters *Service, accounts *AccountService, notifier Notifier, log *zap.Logger) *Scheduler {
+	scheduler := &Scheduler{notifier: notifier, log: log}
+	if config.Enabled() {
+		scheduler.jobs = append(scheduler.jobs, job{name: "characters", interval: config.PollInterval, check: characters.Check})
+	}
+	if config.AccountsEnabled() {
+		scheduler.jobs = append(scheduler.jobs, job{name: "accounts", interval: config.AccountPollInterval, check: accounts.Check})
+	}
+	return scheduler
 }
 
 func RegisterScheduler(lifecycle fx.Lifecycle, scheduler *Scheduler) {
@@ -30,8 +43,8 @@ func RegisterScheduler(lifecycle fx.Lifecycle, scheduler *Scheduler) {
 }
 
 func (s *Scheduler) start(context.Context) error {
-	if !s.config.Enabled() {
-		s.log.Info("presence watcher disabled: PRESENCE_WATCH_NAMES is empty")
+	if len(s.jobs) == 0 {
+		s.log.Info("presence watcher disabled: PRESENCE_WATCH_NAMES and PRESENCE_WATCH_ACCOUNT_IDS are empty")
 		return nil
 	}
 	if !s.notifier.PresenceEnabled() {
@@ -39,23 +52,27 @@ func (s *Scheduler) start(context.Context) error {
 		return nil
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
 	s.mu.Lock()
-	s.cancel, s.done = cancel, done
+	s.cancel = cancel
 	s.mu.Unlock()
-	s.log.Info("presence watcher started", zap.Strings("characters", s.config.Names()), zap.Duration("interval", s.config.PollInterval))
-	go func() { defer close(done); s.run(ctx) }()
+	for _, j := range s.jobs {
+		s.log.Info("presence watcher started", zap.String("watcher", j.name), zap.Duration("interval", j.interval))
+		s.wg.Add(1)
+		go func(j job) { defer s.wg.Done(); s.run(ctx, j) }(j)
+	}
 	return nil
 }
 
 func (s *Scheduler) stop(ctx context.Context) error {
 	s.mu.Lock()
-	cancel, done := s.cancel, s.done
+	cancel := s.cancel
 	s.mu.Unlock()
 	if cancel == nil {
 		return nil
 	}
 	cancel()
+	done := make(chan struct{})
+	go func() { s.wg.Wait(); close(done) }()
 	select {
 	case <-done:
 		return nil
@@ -64,12 +81,12 @@ func (s *Scheduler) stop(ctx context.Context) error {
 	}
 }
 
-func (s *Scheduler) run(ctx context.Context) {
-	ticker := time.NewTicker(s.config.PollInterval)
+func (s *Scheduler) run(ctx context.Context, j job) {
+	ticker := time.NewTicker(j.interval)
 	defer ticker.Stop()
 	for {
-		if err := s.service.Check(ctx); err != nil && ctx.Err() == nil {
-			s.log.Warn("presence check failed", zap.Error(err))
+		if err := j.check(ctx); err != nil && ctx.Err() == nil {
+			s.log.Warn("presence check failed", zap.String("watcher", j.name), zap.Error(err))
 		}
 		select {
 		case <-ticker.C:

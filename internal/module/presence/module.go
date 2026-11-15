@@ -14,6 +14,7 @@ var Module = fx.Module(
 		func(client *discord.Client) Notifier { return client },
 		NewSource,
 		NewService,
+		NewAccountService,
 		NewScheduler,
 	),
 	fx.Invoke(RegisterScheduler),

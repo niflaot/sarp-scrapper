@@ -2,7 +2,7 @@ package presence
 
 import (
 	"context"
-	"errors"
+	"strconv"
 	"strings"
 
 	"github.com/niflaot/sarp-scrapper/pkg/discord"
@@ -12,80 +12,71 @@ import (
 
 type OnlineSource interface {
 	Online(context.Context) ([]Character, error)
+	OnlineAccounts(context.Context) ([]Account, error)
 }
 
 type Notifier interface {
 	PresenceEnabled() bool
 	NotifyPresence(context.Context, discord.PresenceNotice) error
+	NotifyAccountPresence(context.Context, discord.AccountNotice) error
 }
 
-// Service notifies when a watched character goes from offline to online. It
-// keeps its state in memory and must be driven by a single goroutine.
-type Service struct {
-	source    OnlineSource
-	notifier  Notifier
-	log       *zap.Logger
-	watched   map[string]struct{}
-	recipient string
-
-	online map[string]struct{}
-	primed bool
-}
+// Service notifies when a watched character goes from offline to online.
+type Service struct{ tracker tracker[Character] }
 
 func NewService(config presence.Config, source OnlineSource, notifier Notifier, log *zap.Logger) *Service {
 	watched := make(map[string]struct{})
 	for _, name := range config.Names() {
 		watched[normalize(name)] = struct{}{}
 	}
-	return &Service{source: source, notifier: notifier, log: log, watched: watched, recipient: config.DiscordUserID}
+	recipient := config.DiscordUserID
+	return &Service{tracker: tracker[Character]{
+		kind:  "character",
+		fetch: source.Online,
+		key: func(character Character) (string, bool) {
+			key := normalize(character.Name)
+			_, ok := watched[key]
+			return key, ok
+		},
+		notify: func(ctx context.Context, character Character) error {
+			return notifier.NotifyPresence(ctx, discord.PresenceNotice{
+				RecipientID: recipient, CharacterID: character.ID, Character: character.Name,
+				Level: character.Level, Account: character.AccountName,
+			})
+		},
+		log: log,
+	}}
 }
 
-// Check compares the current online list with the previous one. The first
-// successful check only records who is already online. A failed query keeps the
-// previous state, and a failed notification is retried on the next check.
-func (s *Service) Check(ctx context.Context) error {
-	characters, err := s.source.Online(ctx)
-	if err != nil {
-		return err
-	}
-	current := make(map[string]Character)
-	for _, character := range characters {
-		key := normalize(character.Name)
-		if _, ok := s.watched[key]; ok {
-			current[key] = character
-		}
-	}
-	if !s.primed {
-		s.online = make(map[string]struct{}, len(current))
-		for key := range current {
-			s.online[key] = struct{}{}
-		}
-		s.primed = true
-		s.log.Info("presence baseline recorded", zap.Int("watched_online", len(current)))
-		return nil
-	}
+// Check compares the current online list with the previous one.
+func (s *Service) Check(ctx context.Context) error { return s.tracker.check(ctx) }
 
-	next := make(map[string]struct{}, len(current))
-	var failures []error
-	for key, character := range current {
-		if _, was := s.online[key]; was {
-			next[key] = struct{}{}
-			continue
-		}
-		err := s.notifier.NotifyPresence(ctx, discord.PresenceNotice{
-			RecipientID: s.recipient, CharacterID: character.ID, Character: character.Name,
-			Level: character.Level, Account: character.AccountName,
-		})
-		if err != nil {
-			s.log.Warn("presence notification failed; it will be retried", zap.String("character", character.Name), zap.Error(err))
-			failures = append(failures, err)
-			continue
-		}
-		s.log.Info("watched character connected", zap.String("character", character.Name))
-		next[key] = struct{}{}
+// AccountService notifies when a watched SARP account shows up as online.
+type AccountService struct{ tracker tracker[Account] }
+
+func NewAccountService(config presence.Config, source OnlineSource, notifier Notifier, log *zap.Logger) *AccountService {
+	watched := make(map[int64]struct{})
+	for _, id := range config.AccountIDs() {
+		watched[id] = struct{}{}
 	}
-	s.online = next
-	return errors.Join(failures...)
+	recipient := config.DiscordUserID
+	return &AccountService{tracker: tracker[Account]{
+		kind:  "account",
+		fetch: source.OnlineAccounts,
+		key: func(account Account) (string, bool) {
+			_, ok := watched[account.ID]
+			return strconv.FormatInt(account.ID, 10), ok
+		},
+		notify: func(ctx context.Context, account Account) error {
+			return notifier.NotifyAccountPresence(ctx, discord.AccountNotice{
+				RecipientID: recipient, AccountID: account.ID, AccountName: account.Name, AdminLevel: account.AdminLevel,
+			})
+		},
+		log: log,
+	}}
 }
+
+// Check compares the current online-users list with the previous one.
+func (s *AccountService) Check(ctx context.Context) error { return s.tracker.check(ctx) }
 
 func normalize(name string) string { return strings.ToLower(strings.TrimSpace(name)) }

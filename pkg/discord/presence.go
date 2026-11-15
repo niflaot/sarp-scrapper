@@ -39,18 +39,40 @@ type messagePayload struct {
 // a direct message through the bot, or a mention through the webhook.
 func (c *Client) PresenceEnabled() bool { return c.config.BotToken != "" || c.Enabled() }
 
-// NotifyPresence sends a direct message with the bot (when DISCORD_BOT_TOKEN is
-// set) and a mention through the webhook (when DISCORD_WEBHOOK_URL is set). It
-// succeeds when at least one channel delivered the notice, so a closed DM does
-// not cause the webhook mention to be repeated on every retry.
+// AccountNotice describes a watched SARP account that appeared as online.
+type AccountNotice struct {
+	RecipientID string
+	AccountID   int64
+	AccountName string
+	AdminLevel  int
+}
+
+// NotifyPresence tells the recipient that a watched character connected.
 func (c *Client) NotifyPresence(ctx context.Context, notice PresenceNotice) error {
 	text := fmt.Sprintf("🟢 **%s** se acaba de conectar (nivel %d, cuenta %s, ID %d).",
 		escapeMarkdown(notice.Character), notice.Level, escapeMarkdown(notice.Account), notice.CharacterID)
+	return c.deliver(ctx, notice.RecipientID, text)
+}
 
+// NotifyAccountPresence tells the recipient that a watched account is online.
+func (c *Client) NotifyAccountPresence(ctx context.Context, notice AccountNotice) error {
+	text := fmt.Sprintf("🟢 La cuenta **%s** (ID %d) aparece conectada.", escapeMarkdown(notice.AccountName), notice.AccountID)
+	if notice.AdminLevel > 0 {
+		text = fmt.Sprintf("🟢 La cuenta **%s** (ID %d, admin nivel %d) aparece conectada.",
+			escapeMarkdown(notice.AccountName), notice.AccountID, notice.AdminLevel)
+	}
+	return c.deliver(ctx, notice.RecipientID, text)
+}
+
+// deliver sends a direct message with the bot (when DISCORD_BOT_TOKEN is set)
+// and a mention through the webhook (when DISCORD_WEBHOOK_URL is set). It
+// succeeds when at least one channel delivered the text, so a closed DM does
+// not cause the webhook mention to be repeated on every retry.
+func (c *Client) deliver(ctx context.Context, recipientID, text string) error {
 	var failures []error
 	delivered := false
 	if c.config.BotToken != "" {
-		if err := c.sendDirectMessage(ctx, notice.RecipientID, text); err != nil {
+		if err := c.sendDirectMessage(ctx, recipientID, text); err != nil {
 			failures = append(failures, err)
 		} else {
 			delivered = true
@@ -58,9 +80,9 @@ func (c *Client) NotifyPresence(ctx context.Context, notice PresenceNotice) erro
 	}
 	if c.Enabled() {
 		payload := messagePayload{
-			Content:         fmt.Sprintf("<@%s> %s", notice.RecipientID, text),
+			Content:         fmt.Sprintf("<@%s> %s", recipientID, text),
 			Username:        c.config.Username,
-			AllowedMentions: mentions{Parse: []string{}, Users: []string{notice.RecipientID}},
+			AllowedMentions: mentions{Parse: []string{}, Users: []string{recipientID}},
 		}
 		if err := c.postJSON(ctx, c.config.WebhookURL, "", payload, nil, "Discord presence webhook"); err != nil {
 			failures = append(failures, err)

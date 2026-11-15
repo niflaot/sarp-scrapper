@@ -48,3 +48,22 @@ func TestSourceRejectsBadResponses(t *testing.T) {
 		t.Fatalf("an empty list is valid: %#v, %v", characters, err)
 	}
 }
+
+func TestSourceOnlineAccounts(t *testing.T) {
+	querier := &querierStub{body: `{"message":"OK","httpCode":200,"source":"home","payload":{"windowHours":4,"total":217,"users":[{"accountId":1171,"accountName":"varky","adminLevel":0},{"accountId":13297,"accountName":"x","adminLevel":2}]}}`}
+	accounts, err := NewSource(querier).OnlineAccounts(context.Background())
+	if err != nil || len(accounts) != 2 {
+		t.Fatalf("OnlineAccounts() = %#v, %v", accounts, err)
+	}
+	if got := accounts[1]; got.ID != 13297 || got.Name != "x" || got.AdminLevel != 2 {
+		t.Fatalf("unexpected account: %#v", got)
+	}
+	if querier.provider != "sarp" || querier.path != "/home/online-users" {
+		t.Fatalf("unexpected query: %s %s", querier.provider, querier.path)
+	}
+	for name, body := range map[string]string{"no payload": `{}`, "array payload": `{"payload":[]}`, "no users": `{"payload":{"total":0}}`, "null users": `{"payload":{"users":null}}`} {
+		if _, err := NewSource(&querierStub{body: body}).OnlineAccounts(context.Background()); err == nil {
+			t.Fatalf("%s: OnlineAccounts() expected an error", name)
+		}
+	}
+}
